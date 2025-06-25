@@ -108,11 +108,23 @@ with torch.inference_mode():
         labels = labels,
     )
 
-plt.figure(figsize=(9,6))
-plt.imshow(Image.open(os.path.join(png_video_dir, frame_names[ann_frame_idx])))
-show_points(points, labels, plt.gca())
-show_mask((out_mask_logits[0] > 0.0).cpu().numpy(), plt.gca(), obj_id=out_obj_ids[0])
+# run propagation throughout the video and collect the results in a dict
+video_segments = {}  # video_segments contains the per-frame segmentation results
+for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state):
+    video_segments[out_frame_idx] = {
+        out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
+        for i, out_obj_id in enumerate(out_obj_ids)
+    }
 
+# render the segmentation results every few frames
+vis_frame_stride = 10
+plt.close("all") 
+for out_frame_idx in range(0, len(frame_names), vis_frame_stride):
+    plt.figure(figsize=(6, 4))
+    plt.title(f"frame {out_frame_idx}")
+    plt.imshow(Image.open(os.path.join(video_dir, frame_names[out_frame_idx])))
+    for out_obj_id, out_mask in video_segments[out_frame_idx].items():
+        show_mask(out_mask, plt.gca(), obj_id=out_obj_id)
 
 
 
